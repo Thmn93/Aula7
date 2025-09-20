@@ -167,7 +167,7 @@ jobs:
       - name: Enviar email se falhar
         if: failure()
         uses: dawidd6/action-send-mail@v3          
-      # Cadastrar os dados para envio de e-mail e recupera-los aqui 
+      # Cadastrar os dados para envio de e-mail e recupera-los aqui 2
       # Ex.: SMTP DO SERVIDOR DE E-MAIL / PORTA / USUARIO / SENHA / EMAIL E API/TOKEN PARA ENVIO DE E-MAIL)
       # No gmail há uma configuração para geração de secret para envio de e-mails por aplicativos terceiros
       # E-mail deve ser enviado para: fe.dsm.vot.001@gmail.com
