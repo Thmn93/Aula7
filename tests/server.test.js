@@ -1,5 +1,5 @@
 import request from "supertest";
-import app from "../server.js";
+import app from "../tests/server.test.js";
 
 describe("Items API", () => {
   it("GET /health deve responder ok", async () => {
