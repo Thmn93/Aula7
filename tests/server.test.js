@@ -1,5 +1,3 @@
-/* eslint-env jest */
-
 import request from "supertest";
 import app from "../tests/server.test.js";
 

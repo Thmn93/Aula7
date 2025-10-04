@@ -1,9 +1,18 @@
 name: CI / CD
 
 on:
+  # O workflow vai rodar em pushes para as branches principais
   push:
-    # CORREÇÃO: O workflow agora roda na branch 'develop' para automatizar a versão.
-    branches: [develop]
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+      - 'hotfix/**'
+  # E também em pull requests abertos para a main e develop
+  pull_request:
+    branches:
+      - main
+      - develop
 
 jobs:
   pipeline:
@@ -13,16 +22,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          # fetch-depth: 0 é necessário para o script de versionamento ler todo o histórico de commits.
+          # fetch-depth: 0 é essencial para ler todo o histórico de commits para o versionamento
           fetch-depth: 0
 
       - name: Configurar Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18' # É uma boa prática definir a versão do Node.js
+          node-version: '18'
 
       - name: Instalar Dependências
-        # MELHORIA: npm ci é mais rápido e seguro para ambientes de CI.
         run: npm ci
 
       - name: Instalar Semver
@@ -34,9 +42,6 @@ jobs:
       - name: Executar Testes
         run: npm test -- --coverage
 
-      # ETAPA REMOVIDA: A etapa "Criar nova tag caso não exista" foi removida
-      # pois o script principal abaixo já lida com o caso inicial (sem tags).
-
       - name: Calcular nova versão com base nos commits
         id: version
         shell: bash
@@ -44,7 +49,7 @@ jobs:
           set -euo pipefail
           git fetch --tags --force --prune
           
-          # 1) Descobrir a última tag semântica
+          # 1) Descobre a última tag semântica
           LAST_TAG=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1 || true)
           if [ -z "${LAST_TAG:-}" ]; then
             LAST_TAG="v0.0.0"
@@ -53,13 +58,13 @@ jobs:
           
           CURRENT_VERSION="${LAST_TAG#v}"
           
-          # 2) Coletar mensagens de commit desde a última tag
+          # 2) Coleta as mensagens de commit desde a última tag
           LOG_RANGE="${LAST_TAG}..HEAD"
           mapfile -t COMMITS < <(git log ${LOG_RANGE} --pretty=format:'%s' || true)
           echo "Commits desde ${LAST_TAG}:"
           printf ' - %s\n' "${COMMITS[@]:-<nenhum>}"
           
-          # 3) Detectar nível de mudança (MAJOR, MINOR, PATCH)
+          # 3) Detecta o nível de mudança (MAJOR, MINOR, PATCH)
           MAJOR=0; MINOR=0; PATCH=0
           for COMMIT in "${COMMITS[@]:-}"; do
             if [[ "$COMMIT" == *"BREAKING CHANGE"* ]] || [[ "$COMMIT" == *"!:"* ]]; then
@@ -71,7 +76,7 @@ jobs:
             fi
           done
           
-          # 4) Calcular nova versão
+          # 4) Calcula a nova versão
           NEW_VERSION="$CURRENT_VERSION"
           if [[ $MAJOR -eq 1 ]]; then
             NEW_VERSION=$(semver -i major "$CURRENT_VERSION")
@@ -83,7 +88,7 @@ jobs:
           
           echo "Versões (atual -> nova): $CURRENT_VERSION -> $NEW_VERSION"
           
-          # 5) Exportar resultados para os próximos passos
+          # 5) Exporta os resultados para os próximos passos
           if [ "$CURRENT_VERSION" = "$NEW_VERSION" ]; then
             echo "should_deploy=false" >> "$GITHUB_OUTPUT"
           else
@@ -92,13 +97,14 @@ jobs:
             echo "NEW_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
           fi
 
+      # As 3 etapas seguintes (atualizar, commitar e push) SÓ RODAM se houver uma nova versão E se o push for na branch 'develop'
       - name: Atualizar versão no package.json
-        if: steps.version.outputs.should_deploy == 'true'
+        if: steps.version.outputs.should_deploy == 'true' && github.ref == 'refs/heads/develop'
         run: |
           npm version "${{ env.NEW_VERSION }}" --no-git-tag-version
 
       - name: Fazer commit da nova versão
-        if: steps.version.outputs.should_deploy == 'true'
+        if: steps.version.outputs.should_deploy == 'true' && github.ref == 'refs/heads/develop'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -107,22 +113,21 @@ jobs:
           git tag "v${{ env.NEW_VERSION }}"
 
       - name: Fazer push do commit e da tag
-        if: steps.version.outputs.should_deploy == 'true'
+        if: steps.version.outputs.should_deploy == 'true' && github.ref == 'refs/heads/develop'
         run: |
-          # CORREÇÃO: Faz o push para a branch que acionou o workflow (develop)
           git push
           git push origin "v${{ env.NEW_VERSION }}"
 
-      # CORREÇÃO: Passo de envio de e-mail totalmente preenchido.
+      # Passo de envio de e-mail unificado e corrigido
       - name: Enviar email em caso de falha
         if: failure()
         uses: dawidd6/action-send-mail@v3
         with:
-          # Configure o servidor de e-mail (exemplo do Gmail)
+          # Configuração padrão para o Gmail
           server_address: smtp.gmail.com
           server_port: 465
           
-          # Use os secrets do repositório para segurança
+          # Use os secrets do repositório para segurança (padronizado para MAIL_*)
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
           
