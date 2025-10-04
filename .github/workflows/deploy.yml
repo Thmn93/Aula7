@@ -2,7 +2,15 @@ name: CI / CD
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+      - 'hotfix/**'
+  pull_request:
+    branches:
+      - main
+      - develop
 
 jobs:
   pipeline:
@@ -127,7 +135,7 @@ jobs:
           fi
       
       - name: Atualizar versão no package.json
-        if: steps.version.outputs.should_deploy == 'true' && github.ref == 'refs/heads/develop'
+        if: steps.version.outputs.should_deploy == 'true' && github.ref == 'refs/heads/main'
         env:
           NEW_VERSION: ${{ steps.version.outputs.new_version }}
         run: |
@@ -166,8 +174,30 @@ jobs:
       # Envio de e-mail EM CASO DE FALHA no pipeline
       - name: Enviar email se falhar
         if: failure()
+<<<<<<< HEAD
+        uses: dawidd6/action-send-mail@v6
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          secure: false
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: Falha pipeline Actions
+          to: fe.dsm.vot.001@gmail.com
+          from: ${{ secrets.EMAIL_USERNAME }}
+          body: |
+            A execução falhou.
+            Repositório: ${{ github.repository }}
+            Commit: ${{ github.sha }}
+            Workflow: ${{ github.workflow }}
+            Job: ${{ github.job }}
+            Veja os logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+ 
+ # Cadastrar os dados para envio de e-mail e recupera-los aqui 
+=======
         uses: dawidd6/action-send-mail@v3          
       # Cadastrar os dados para envio de e-mail e recupera-los aqui 2
+>>>>>>> d62317d2e3b436443998af37f4a903731a835f7e
       # Ex.: SMTP DO SERVIDOR DE E-MAIL / PORTA / USUARIO / SENHA / EMAIL E API/TOKEN PARA ENVIO DE E-MAIL)
       # No gmail há uma configuração para geração de secret para envio de e-mails por aplicativos terceiros
       # E-mail deve ser enviado para: fe.dsm.vot.001@gmail.com
